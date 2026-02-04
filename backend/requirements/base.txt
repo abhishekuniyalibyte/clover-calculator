@@ -1,0 +1,29 @@
+# Core Django
+Django==5.0.1
+psycopg2-binary==2.9.9
+
+# Django REST Framework
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+
+# CORS
+django-cors-headers==4.3.1
+
+# Filtering
+django-filter==23.5
+
+# Environment variables
+python-decouple==3.8
+
+# Image processing
+Pillow==10.2.0
+
+# Timezone support
+pytz==2024.1
+
+# Validation
+django-phonenumber-field==7.3.0
+phonenumbers==8.13.27
+
+# Password strength
+django-password-validators==1.7.1

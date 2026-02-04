@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clover Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 1.5em;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info span {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            padding: 8px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 30px;
+            background: rgba(255,255,255,0.3);
+            color: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 0 8px 8px 8px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="date"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.3s;
+            background: white;
+        }
+
+        .file-upload-area:hover {
+            background: #f0f4ff;
+        }
+
+        .file-upload-area.dragover {
+            background: #e3edff;
+            border-color: #4c5fd5;
+        }
+
+        .file-upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        .response {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .response.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .response.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .response.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .uploaded-file {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .uploaded-file span {
+            flex: 1;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .login-prompt {
+            text-align: center;
+            padding: 60px 20px;
+            color: white;
+        }
+
+        .login-prompt h2 {
+            margin-bottom: 20px;
+        }
+
+        .login-prompt button {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Login Prompt -->
+        <div id="loginPrompt" class="login-prompt">
+            <h2>Please Login First</h2>
+            <p>You need to login to access the dashboard</p>
+            <button onclick="window.location.href='test_ui.html'">Go to Login Page</button>
+        </div>
+
+        <!-- Dashboard (Hidden until login) -->
+        <div id="dashboard" style="display: none;">
+            <!-- Header -->
+            <div class="header">
+                <h1>📊 Clover Dashboard</h1>
+                <div class="user-info">
+                    <span id="userDisplay"></span>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('agent')">👤 Agent</button>
+                <button class="tab" onclick="showTab('admin')">🔧 Admin</button>
+            </div>
+
+            <!-- Agent Tab Content -->
+            <div id="agentTab" class="tab-content active">
+                <h2 style="margin-bottom: 20px; color: #667eea;">Agent Dashboard</h2>
+
+                <!-- Upload Data Section -->
+                <div class="card">
+                    <h3>📤 Upload Statement (PDF/Image)</h3>
+                    <div class="file-upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                        <div class="file-upload-icon">📄</div>
+                        <h4>Drop PDF or Image here</h4>
+                        <p>or click to browse</p>
+                        <p style="font-size: 12px; color: #666; margin-top: 10px;">Supported: PDF, JPG, PNG</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(event)">
+
+                    <div id="uploadedFile" style="display: none;" class="uploaded-file">
+                        <span id="fileName"></span>
+                        <button onclick="uploadFile()" style="padding: 8px 20px;">Extract Data</button>
+                    </div>
+
+                    <div id="uploadResponse" class="response"></div>
+                </div>
+
+                <!-- Manual Data Entry Section -->
+                <div class="card">
+                    <h3>✍️ Manual Data Entry</h3>
+                    <form id="manualEntryForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Merchant Name *</label>
+                                <input type="text" id="merchantName" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Business Type</label>
+                                <input type="text" id="businessType">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Statement Period Start *</label>
+                                <input type="date" id="periodStart" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Statement Period End *</label>
+                                <input type="date" id="periodEnd" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Total Volume ($) *</label>
+                                <input type="number" id="totalVolume" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Transaction Count *</label>
+                                <input type="number" id="transactionCount" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Interchange Fees ($)</label>
+                                <input type="number" id="interchangeFees" step="0.01" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Processing Fees ($)</label>
+                                <input type="number" id="processingFees" step="0.01" value="0">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Monthly Fees ($)</label>
+                                <input type="number" id="monthlyFees" step="0.01" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Other Fees ($)</label>
+                                <input type="number" id="otherFees" step="0.01" value="0">
+                            </div>
+                        </div>
+
+                        <button type="submit">Submit Data</button>
+                    </form>
+                    <div id="manualEntryResponse" class="response"></div>
+                </div>
+            </div>
+
+            <!-- Admin Tab Content -->
+            <div id="adminTab" class="tab-content">
+                <h2 style="margin-bottom: 20px; color: #667eea;">Admin Dashboard</h2>
+
+                <div class="card">
+                    <h3>👥 User Management</h3>
+                    <p>View and manage all users in the system</p>
+                    <button onclick="window.open('http://localhost:8000/admin/', '_blank')">Open Django Admin</button>
+                </div>
+
+                <div class="card">
+                    <h3>📊 Analytics</h3>
+                    <p>Coming soon: View system analytics and reports</p>
+                </div>
+
+                <div class="card">
+                    <h3>⚙️ Settings</h3>
+                    <p>Coming soon: Configure pricing models, devices, and fees</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let currentUser = null;
+        let accessToken = null;
+        let selectedFile = null;
+
+        // Check if user is logged in
+        window.onload = function() {
+            const storedToken = localStorage.getItem('accessToken');
+            const storedUser = localStorage.getItem('currentUser');
+
+            if (storedToken && storedUser) {
+                accessToken = storedToken;
+                currentUser = JSON.parse(storedUser);
+                showDashboard();
+            }
+        };
+
+        function showDashboard() {
+            document.getElementById('loginPrompt').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('userDisplay').textContent = `${currentUser.username} (${currentUser.role})`;
+        }
+
+        function logout() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('currentUser');
+            window.location.href = 'test_ui.html';
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            // Validate file type
+            const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if (!validTypes.includes(file.type)) {
+                showResponse('uploadResponse', '❌ Invalid file type. Please upload PDF or Image', 'error');
+                return;
+            }
+
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                showResponse('uploadResponse', '❌ File too large. Max size is 10MB', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('fileName').textContent = `📄 ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+            document.getElementById('uploadedFile').style.display = 'flex';
+            showResponse('uploadResponse', '✓ File ready to upload', 'info');
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                showResponse('uploadResponse', '❌ Please select a file first', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            showResponse('uploadResponse', '⏳ Uploading and extracting data...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/statements/upload/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResponse('uploadResponse',
+                        `✅ File uploaded successfully! Extracted data will appear here.`,
+                        'success');
+                } else {
+                    showResponse('uploadResponse', '❌ Upload failed: ' + (result.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showResponse('uploadResponse', '❌ Network error. Is the server running?', 'error');
+            }
+        }
+
+        // Manual Entry Form
+        document.getElementById('manualEntryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                merchant_name: document.getElementById('merchantName').value,
+                business_type: document.getElementById('businessType').value,
+                period_start: document.getElementById('periodStart').value,
+                period_end: document.getElementById('periodEnd').value,
+                total_volume: parseFloat(document.getElementById('totalVolume').value),
+                transaction_count: parseInt(document.getElementById('transactionCount').value),
+                interchange_fees: parseFloat(document.getElementById('interchangeFees').value),
+                processing_fees: parseFloat(document.getElementById('processingFees').value),
+                monthly_fees: parseFloat(document.getElementById('monthlyFees').value),
+                other_fees: parseFloat(document.getElementById('otherFees').value)
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/statements/manual/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResponse('manualEntryResponse', '✅ Data submitted successfully!', 'success');
+                    document.getElementById('manualEntryForm').reset();
+                } else {
+                    showResponse('manualEntryResponse', '❌ Submission failed', 'error');
+                }
+            } catch (error) {
+                showResponse('manualEntryResponse', '❌ Network error. Is the server running?', 'error');
+            }
+        });
+
+        function showResponse(elementId, message, type) {
+            const div = document.getElementById(elementId);
+            div.className = `response ${type}`;
+            div.innerHTML = `<strong>${message}</strong>`;
+            div.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
