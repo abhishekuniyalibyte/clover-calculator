@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+import logging
 
 from .models import MerchantStatement, StatementData
 from .serializers import (
@@ -11,6 +12,9 @@ from .serializers import (
     ManualEntrySerializer,
     StatementDataSerializer
 )
+from .services import StatementProcessingService
+
+logger = logging.getLogger(__name__)
 
 
 class FileUploadView(APIView):
@@ -42,16 +46,44 @@ class FileUploadView(APIView):
             file_type=uploaded_file.content_type
         )
 
-        # TODO: Trigger async task for PDF extraction (Milestone 4)
-        # For now, just mark as pending
+        # Process the PDF immediately (synchronous for now)
+        # TODO: Move to async task queue (Celery) for production
+        try:
+            success = StatementProcessingService.process_uploaded_statement(statement)
 
-        return Response({
-            'message': 'File uploaded successfully',
-            'statement_id': statement.id,
-            'file_name': statement.file_name,
-            'status': statement.status,
-            'note': 'PDF extraction will be implemented in Milestone 4'
-        }, status=status.HTTP_201_CREATED)
+            # Refresh from database to get updated data
+            statement.refresh_from_db()
+
+            response_data = {
+                'message': 'File uploaded and processed successfully' if success else 'File uploaded but processing failed',
+                'statement_id': statement.id,
+                'file_name': statement.file_name,
+                'status': statement.status,
+                'processor': statement.processor_name,
+                'merchant_name': statement.merchant_name,
+                'statement_period_start': str(statement.statement_period_start) if statement.statement_period_start else None,
+                'statement_period_end': str(statement.statement_period_end) if statement.statement_period_end else None,
+                'extraction_confidence': float(statement.extraction_confidence) if statement.extraction_confidence else 0,
+                'requires_review': statement.requires_review,
+            }
+
+            # Add extracted financial data if available
+            if success and hasattr(statement, 'data'):
+                data_serializer = StatementDataSerializer(statement.data)
+                response_data['extracted_data'] = data_serializer.data
+
+            if not success:
+                response_data['extraction_notes'] = statement.extraction_notes
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Error processing statement: {str(e)}", exc_info=True)
+            return Response({
+                'message': 'File uploaded but processing failed',
+                'statement_id': statement.id,
+                'error': str(e)
+            }, status=status.HTTP_201_CREATED)
 
 
 class ManualEntryView(APIView):

@@ -1,0 +1,46 @@
+ARCHITECTURE
+
+The system helps sales agents analyze merchant payment statements and generate pricing proposals.
+
+System Flow:
+- Agent uploads merchant statement PDF
+- OCR extracts text from document
+- Processor-specific parsers identify data (Chase, Clover, Square, etc.)
+- System extracts merchant details, periods, volumes, fees
+- Data saves to database with confidence score
+- Agent reviews and generates proposals
+
+Architecture Pattern:
+- REST API using Django backend
+- JSON endpoints for authentication, uploads, data retrieval
+- Factory pattern for processor detection
+- Service layer for business logic
+- Synchronous PDF processing
+
+Database Schema:
+- User model (email, password, role)
+- MerchantStatement model (metadata, file info, processor type)
+- StatementData model (volumes, transactions, fees, card breakdowns)
+
+
+TECH STACK
+
+Backend:
+- Python 3.10
+- Django 5.0
+- Django REST Framework
+- JWT authentication
+- PostgreSQL (production)
+- SQLite (development)
+
+PDF Extraction:
+- pdfplumber (PDF text extraction)
+- LLaMA 4 Maverick via Groq API (intelligent data extraction)
+- PyMuPDF (PDF rendering)
+- Pillow (image processing)
+
+Security:
+- PBKDF2 password hashing
+- Role-based access control
+- JWT tokens
+- File upload validation

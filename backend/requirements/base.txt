@@ -27,3 +27,11 @@ phonenumbers==8.13.27
 
 # Password strength
 django-password-validators==1.7.1
+
+# PDF Processing
+pdfplumber==0.11.0
+PyMuPDF==1.23.26
+Pillow==10.2.0
+
+# LLM for data extraction
+groq==0.11.0

@@ -493,9 +493,71 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    showResponse('uploadResponse',
-                        `✅ File uploaded successfully! Extracted data will appear here.`,
-                        'success');
+                    // Display extracted data
+                    let message = `${result.message}<br><br>`;
+                    message += `<strong>Extraction Results:</strong><br>`;
+                    message += `Processor: <strong>${result.processor || 'Unknown'}</strong><br>`;
+                    message += `Merchant: <strong>${result.merchant_name || 'Not extracted'}</strong><br>`;
+
+                    if (result.statement_period_start && result.statement_period_end) {
+                        message += `Period: ${result.statement_period_start} to ${result.statement_period_end}<br>`;
+                    }
+
+                    message += `Confidence: <strong>${result.extraction_confidence}%</strong><br>`;
+                    message += `Status: <strong>${result.status}</strong><br>`;
+
+                    // Display extracted financial data
+                    if (result.extracted_data) {
+                        const data = result.extracted_data;
+
+                        message += `<br><strong>Financial Summary:</strong><br>`;
+                        message += `Total Volume: <strong>$${parseFloat(data.total_volume || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong><br>`;
+                        message += `Transactions: <strong>${data.transaction_count || 0}</strong><br>`;
+
+                        if (data.effective_rate) {
+                            message += `Effective Rate: <strong>${parseFloat(data.effective_rate).toFixed(4)}%</strong><br>`;
+                        }
+
+                        message += `<br><strong>Card Breakdown:</strong><br>`;
+
+                        if (parseFloat(data.visa_volume || 0) > 0) {
+                            message += `Visa: $${parseFloat(data.visa_volume).toLocaleString('en-US', {minimumFractionDigits: 2})} (${data.visa_count} txns)<br>`;
+                        }
+                        if (parseFloat(data.mastercard_volume || 0) > 0) {
+                            message += `Mastercard: $${parseFloat(data.mastercard_volume).toLocaleString('en-US', {minimumFractionDigits: 2})} (${data.mastercard_count} txns)<br>`;
+                        }
+                        if (parseFloat(data.amex_volume || 0) > 0) {
+                            message += `Amex: $${parseFloat(data.amex_volume).toLocaleString('en-US', {minimumFractionDigits: 2})} (${data.amex_count} txns)<br>`;
+                        }
+                        if (parseFloat(data.discover_volume || 0) > 0) {
+                            message += `Discover: $${parseFloat(data.discover_volume).toLocaleString('en-US', {minimumFractionDigits: 2})} (${data.discover_count} txns)<br>`;
+                        }
+
+                        message += `<br><strong>Fees:</strong><br>`;
+                        message += `Interchange: $${parseFloat(data.interchange_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}<br>`;
+                        message += `Assessment: $${parseFloat(data.assessment_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}<br>`;
+                        message += `Processing: $${parseFloat(data.processing_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}<br>`;
+                        message += `Monthly: $${parseFloat(data.monthly_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}<br>`;
+
+                        const totalFees = parseFloat(data.interchange_fees || 0) +
+                                        parseFloat(data.assessment_fees || 0) +
+                                        parseFloat(data.processing_fees || 0) +
+                                        parseFloat(data.monthly_fees || 0) +
+                                        parseFloat(data.other_fees || 0);
+                        message += `<strong>Total Fees: $${totalFees.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong><br>`;
+                    }
+
+                    if (result.requires_review) {
+                        message += `<br><strong>WARNING: This extraction requires manual review</strong><br>`;
+                    }
+
+                    if (result.extraction_notes) {
+                        message += `<br>Notes: ${result.extraction_notes}<br>`;
+                    }
+
+                    message += `<br>Statement ID: ${result.statement_id}`;
+
+                    showResponse('uploadResponse', message, 'success');
                 } else {
                     showResponse('uploadResponse', '❌ Upload failed: ' + (result.message || 'Unknown error'), 'error');
                 }
