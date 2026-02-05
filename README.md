@@ -8,20 +8,21 @@ The platform helps sales agents:
 - Upload and analyze merchant payment statements
 - Compare multiple pricing models (Cost-plus, iPlus, Discount rate, Flat)
 - Calculate savings across different timeframes
-- Generate client-ready PDF proposals
+- Generate shareable PDF proposals
 
 **Current Status:** Milestone 2 - Backend authentication and user management implemented 
 
 ## Project Structure
 
 ```
-clover-project/
+clover-calculator/
 ├── backend/                     # Django REST API (Active)
 │   ├── apps/accounts/          # Authentication & user management
 │   ├── config/                 # Django settings
 │   └── requirements/           # Python dependencies
 ├── workflow.md                 # Project milestones (200-240 hours)
-├── django_backend_design.md    # Detailed architecture & data models
+├── system_archietcure.md       # Architecture + tech stack
+├── clover_archietecture.pdf    # Architecture PDF export
 └── README.md                   # This file
 ```
 
@@ -30,7 +31,7 @@ clover-project/
 - **Backend:** Django 5.0 + Django REST Framework
 - **Database:** PostgreSQL 14+
 - **Authentication:** JWT (djangorestframework-simplejwt)
-- **Frontend:** Flutter (planned - Milestone 3)
+- **Frontend:** Flutter (iPad-first; planned/in-progress)
 
 ## Quick Start
 
@@ -45,8 +46,8 @@ clover-project/
 cd backend
 
 # 2. Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+python3 -m venv myenv
+source myenv/bin/activate  # Windows: myenv\Scripts\activate
 
 # 3. Install dependencies
 pip install -r requirements/development.txt
@@ -59,13 +60,13 @@ cp .env.example .env
 createdb clover_db
 
 # 6. Run migrations
-python manage.py migrate
+python3 manage.py migrate
 
 # 7. Create admin user
-python manage.py createsuperuser
+python3 manage.py createsuperuser
 
 # 8. Start server
-python manage.py runserver
+python3 manage.py runserver
 ```
 
 Access the API at `http://localhost:8000/api/v1/`
@@ -76,8 +77,8 @@ Access the API at `http://localhost:8000/api/v1/`
 
 ```bash
 cd backend
-source venv/bin/activate  # Windows: venv\Scripts\activate
-python manage.py runserver
+source myenv/bin/activate  # Windows: myenv\Scripts\activate
+python3 manage.py runserver
 ```
 
 Keep this terminal running. Server will be available at `http://localhost:8000/`
@@ -146,8 +147,8 @@ Or manually open `backend/test_ui.html` in your browser.
 ## Documentation
 
 - **[workflow.md](workflow.md)** - Project milestones and timeline (10 milestones)
-- **[django_backend_design.md](django_backend_design.md)** - Complete architecture, data models, API specs
-- **[backend/README.md](backend/README.md)** - Backend-specific setup and commands
+- **[system_archietcure.md](system_archietcure.md)** - Architecture + tech stack
+- **[backend/backend_README.md](backend/backend_README.md)** - Backend-specific setup and commands
 
 ## Development
 
@@ -163,8 +164,8 @@ black . && isort . && flake8
 
 **Create migrations:**
 ```bash
-python manage.py makemigrations
-python manage.py migrate
+python3 manage.py makemigrations
+python3 manage.py migrate
 ```
 
 ## Example Usage
@@ -203,7 +204,7 @@ Returns JWT tokens for authenticated requests.
 
 ## Contributing
 
-See [django_backend_design.md](django_backend_design.md) for architecture details before contributing.
+See [system_archietcure.md](system_archietcure.md) for architecture details before contributing.
 
 **Git workflow:**
 1. Create feature branch: `git checkout -b feature/name`
