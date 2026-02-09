@@ -1,6 +1,19 @@
 from rest_framework import permissions
 
 
+class IsSuperUser(permissions.BasePermission):
+    """
+    Permission class to check if user is a Django superuser
+    """
+
+    def has_permission(self, request, view):
+        return (
+            request.user and
+            request.user.is_authenticated and
+            request.user.is_superuser
+        )
+
+
 class IsAdmin(permissions.BasePermission):
     """
     Permission class to check if user is an administrator
@@ -46,8 +59,8 @@ class IsOwnerOrAdmin(permissions.BasePermission):
     """
 
     def has_object_permission(self, request, view, obj):
-        # Admins have full access
-        if request.user.role == 'ADMIN':
+        # Superusers and Admins have full access
+        if request.user.is_superuser or request.user.role == 'ADMIN':
             return True
 
         # Check if the object has a user or created_by field

@@ -9,6 +9,8 @@ from .views import (
     ChangePasswordView,
     UserListView,
     UserDetailView,
+    CreateAdminView,
+    CreateAgentView,
 )
 
 app_name = 'accounts'
@@ -27,4 +29,8 @@ urlpatterns = [
     # User management (Admin only)
     path('users/', UserListView.as_view(), name='user_list'),
     path('users/<int:pk>/', UserDetailView.as_view(), name='user_detail'),
+
+    # User creation with hierarchy (Superuser/Admin only)
+    path('admin/create-admin/', CreateAdminView.as_view(), name='create_admin'),
+    path('admin/create-agent/', CreateAgentView.as_view(), name='create_agent'),
 ]

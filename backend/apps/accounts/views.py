@@ -10,9 +10,11 @@ from .serializers import (
     LoginSerializer,
     UserSerializer,
     ChangePasswordSerializer,
-    UserProfileUpdateSerializer
+    UserProfileUpdateSerializer,
+    CreateAdminSerializer,
+    CreateAgentSerializer
 )
-from .permissions import IsAdmin, IsAdminOrAgent
+from .permissions import IsAdmin, IsAdminOrAgent, IsSuperUser
 from .models import UserProfile
 
 User = get_user_model()
@@ -20,31 +22,23 @@ User = get_user_model()
 
 class RegisterView(generics.CreateAPIView):
     """
-    API endpoint for user registration
+    API endpoint for user registration (DISABLED - Use admin endpoints instead)
     POST /api/v1/auth/register/
+
+    Note: Public registration is disabled. Users must be created by:
+    - Superuser creates Admin via /api/v1/auth/admin/create-admin/
+    - Admin creates Agent via /api/v1/auth/admin/create-agent/
     """
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-
-        # Generate tokens for the new user
-        refresh = RefreshToken.for_user(user)
-
-        # Return user data with tokens
-        user_serializer = UserSerializer(user)
+        # Disable public registration
         return Response({
-            'user': user_serializer.data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            },
-            'message': 'User registered successfully'
-        }, status=status.HTTP_201_CREATED)
+            'error': 'Public registration is disabled',
+            'message': 'Please contact an administrator to create your account'
+        }, status=status.HTTP_403_FORBIDDEN)
 
 
 class LoginView(APIView):
@@ -219,3 +213,51 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response({
             'message': 'User deleted successfully'
         }, status=status.HTTP_204_NO_CONTENT)
+
+
+class CreateAdminView(generics.CreateAPIView):
+    """
+    API endpoint for superuser to create admin users
+    POST /api/v1/auth/admin/create-admin/
+
+    Requires: Django superuser (is_superuser=True)
+    """
+    queryset = User.objects.all()
+    serializer_class = CreateAdminSerializer
+    permission_classes = [IsSuperUser]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Return user data without tokens (admin creates, doesn't auto-login)
+        user_serializer = UserSerializer(user)
+        return Response({
+            'user': user_serializer.data,
+            'message': 'Admin user created successfully'
+        }, status=status.HTTP_201_CREATED)
+
+
+class CreateAgentView(generics.CreateAPIView):
+    """
+    API endpoint for admin to create agent users
+    POST /api/v1/auth/admin/create-agent/
+
+    Requires: Admin role (role='ADMIN') or Superuser
+    """
+    queryset = User.objects.all()
+    serializer_class = CreateAgentSerializer
+    permission_classes = [IsAdmin | IsSuperUser]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Return user data without tokens (admin creates, doesn't auto-login)
+        user_serializer = UserSerializer(user)
+        return Response({
+            'user': user_serializer.data,
+            'message': 'Agent user created successfully'
+        }, status=status.HTTP_201_CREATED)

@@ -200,3 +200,121 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ['avatar', 'bio', 'preferred_language', 'timezone', 'notification_preferences']
+
+
+class CreateAdminSerializer(serializers.ModelSerializer):
+    """Serializer for superuser to create admin users"""
+
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+    email = serializers.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'username', 'email', 'password', 'password_confirm',
+            'first_name', 'last_name', 'phone', 'organization'
+        ]
+
+    def validate_email(self, value):
+        """Validate that email is unique"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_username(self, value):
+        """Validate that username is unique"""
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    def validate(self, attrs):
+        """Validate that passwords match"""
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({
+                "password_confirm": "Password fields didn't match."
+            })
+        return attrs
+
+    def create(self, validated_data):
+        """Create a new admin user"""
+        # Remove password_confirm as it's not needed for user creation
+        validated_data.pop('password_confirm')
+
+        # Extract password
+        password = validated_data.pop('password')
+
+        # Create admin user with fixed role
+        user = User.objects.create(role='ADMIN', **validated_data)
+        user.set_password(password)
+        user.save()
+
+        return user
+
+
+class CreateAgentSerializer(serializers.ModelSerializer):
+    """Serializer for admin to create agent users"""
+
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+    email = serializers.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'username', 'email', 'password', 'password_confirm',
+            'first_name', 'last_name', 'phone', 'organization'
+        ]
+
+    def validate_email(self, value):
+        """Validate that email is unique"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_username(self, value):
+        """Validate that username is unique"""
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    def validate(self, attrs):
+        """Validate that passwords match"""
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({
+                "password_confirm": "Password fields didn't match."
+            })
+        return attrs
+
+    def create(self, validated_data):
+        """Create a new agent user"""
+        # Remove password_confirm as it's not needed for user creation
+        validated_data.pop('password_confirm')
+
+        # Extract password
+        password = validated_data.pop('password')
+
+        # Create agent user with fixed role
+        user = User.objects.create(role='AGENT', **validated_data)
+        user.set_password(password)
+        user.save()
+
+        return user
