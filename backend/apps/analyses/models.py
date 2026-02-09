@@ -210,3 +210,453 @@ class Analysis(models.Model):
     def is_submitted(self):
         """Check if analysis is submitted"""
         return self.status == 'SUBMITTED'
+
+
+class MerchantHardware(models.Model):
+    """Model for merchant's current hardware/software costs"""
+
+    ITEM_TYPE_CHOICES = [
+        ('POS_TERMINAL', 'POS Terminal'),
+        ('CARD_READER', 'Card Reader'),
+        ('PRINTER', 'Printer'),
+        ('SCANNER', 'Scanner'),
+        ('SOFTWARE', 'Software'),
+        ('OTHER', 'Other'),
+    ]
+
+    COST_TYPE_CHOICES = [
+        ('MONTHLY_LEASE', 'Monthly Lease'),
+        ('MONTHLY_SUBSCRIPTION', 'Monthly Subscription'),
+        ('ONE_TIME_PURCHASE', 'One-Time Purchase'),
+        ('PER_TRANSACTION', 'Per Transaction'),
+    ]
+
+    analysis = models.ForeignKey(
+        'Analysis',
+        on_delete=models.CASCADE,
+        related_name='hardware_costs',
+        help_text='Analysis this hardware cost belongs to'
+    )
+    item_type = models.CharField(
+        max_length=30,
+        choices=ITEM_TYPE_CHOICES,
+        help_text='Type of hardware/software item'
+    )
+    item_name = models.CharField(
+        max_length=255,
+        help_text='Name of the hardware/software (e.g., "Square Terminal")'
+    )
+    provider = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Provider/vendor name (e.g., "Square", "Clover")'
+    )
+    cost_type = models.CharField(
+        max_length=30,
+        choices=COST_TYPE_CHOICES,
+        help_text='Type of cost structure'
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Cost amount in dollars'
+    )
+    quantity = models.IntegerField(
+        default=1,
+        help_text='Number of units'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Additional notes about this hardware/software'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_merchanthardware'
+        verbose_name = 'Merchant Hardware'
+        verbose_name_plural = 'Merchant Hardware'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['analysis', '-created_at']),
+            models.Index(fields=['item_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.item_name} - {self.get_item_type_display()} (Analysis: {self.analysis.id})"
+
+    @property
+    def total_cost(self):
+        """Calculate total cost based on quantity"""
+        return self.amount * self.quantity
+
+
+class PricingModel(models.Model):
+    """Model for Blockpay pricing proposals"""
+
+    MODEL_TYPE_CHOICES = [
+        ('COST_PLUS', 'Cost-Plus (Interchange+)'),
+        ('I_PLUS', 'iPlus'),
+        ('DISCOUNT_RATE', 'Discount Rate'),
+        ('FLAT', 'Flat Rate'),
+    ]
+
+    analysis = models.ForeignKey(
+        'Analysis',
+        on_delete=models.CASCADE,
+        related_name='pricing_models',
+        help_text='Analysis this pricing model belongs to'
+    )
+    model_type = models.CharField(
+        max_length=20,
+        choices=MODEL_TYPE_CHOICES,
+        help_text='Type of pricing model'
+    )
+    is_selected = models.BooleanField(
+        default=False,
+        help_text='Whether this is the selected pricing model for the proposal'
+    )
+    markup_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Markup percentage for cost-plus/iPlus (e.g., 0.50 for 0.5%)'
+    )
+    basis_points = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Basis points markup for cost-plus model'
+    )
+    discount_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Discount rate percentage (e.g., 2.50 for 2.5%)'
+    )
+    per_transaction_fee = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text='Per-transaction fee in dollars (e.g., 0.10 for $0.10)'
+    )
+    monthly_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly fee in dollars'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Additional notes about this pricing model'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_pricingmodel'
+        verbose_name = 'Pricing Model'
+        verbose_name_plural = 'Pricing Models'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['analysis', 'is_selected']),
+            models.Index(fields=['model_type']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['analysis', 'model_type'],
+                name='unique_analysis_model_type'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_model_type_display()} for Analysis {self.analysis.id}"
+
+
+class DeviceCatalogItem(models.Model):
+    """Admin-managed catalog of Clover devices"""
+
+    CATEGORY_CHOICES = [
+        ('DEVICE', 'Device'),
+        ('ACCESSORY', 'Accessory'),
+        ('GATEWAY', 'Gateway'),
+    ]
+
+    name = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text='Device name (e.g., "Clover Flex", "Clover Mini")'
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        help_text='Device category'
+    )
+    device_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Device type/model (e.g., "Flex", "Mini", "Station Duo")'
+    )
+    description = models.TextField(
+        blank=True,
+        help_text='Device description and features'
+    )
+    image = models.ImageField(
+        upload_to='devices/',
+        null=True,
+        blank=True,
+        help_text='Device image'
+    )
+    lease_price_min = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Minimum monthly lease price'
+    )
+    lease_price_max = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Maximum monthly lease price'
+    )
+    purchase_price_min = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Minimum one-time purchase price'
+    )
+    purchase_price_max = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Maximum one-time purchase price'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this device is available for selection'
+    )
+    sort_order = models.IntegerField(
+        default=0,
+        help_text='Display order (lower numbers appear first)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_devicecatalogitem'
+        verbose_name = 'Device Catalog Item'
+        verbose_name_plural = 'Device Catalog Items'
+        ordering = ['sort_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProposedDevice(models.Model):
+    """Devices proposed for a specific analysis"""
+
+    PRICING_TYPE_CHOICES = [
+        ('LEASE', 'Lease'),
+        ('PURCHASE', 'Purchase'),
+    ]
+
+    analysis = models.ForeignKey(
+        'Analysis',
+        on_delete=models.CASCADE,
+        related_name='proposed_devices',
+        help_text='Analysis this device proposal belongs to'
+    )
+    device = models.ForeignKey(
+        DeviceCatalogItem,
+        on_delete=models.PROTECT,
+        related_name='proposals',
+        help_text='Device from the catalog'
+    )
+    quantity = models.IntegerField(
+        default=1,
+        help_text='Number of devices'
+    )
+    pricing_type = models.CharField(
+        max_length=10,
+        choices=PRICING_TYPE_CHOICES,
+        help_text='Lease or purchase'
+    )
+    selected_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Selected price (monthly for lease, one-time for purchase)'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Additional notes about this device proposal'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_proposeddevice'
+        verbose_name = 'Proposed Device'
+        verbose_name_plural = 'Proposed Devices'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['analysis', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.device.name} x{self.quantity} ({self.get_pricing_type_display()}) - Analysis {self.analysis.id}"
+
+    @property
+    def total_cost(self):
+        """Calculate total cost based on quantity"""
+        return self.selected_price * self.quantity
+
+
+class SaaSCatalogItem(models.Model):
+    """Admin-managed catalog of Clover SaaS plans"""
+
+    plan_name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text='SaaS plan name (e.g., "Clover Essentials", "Clover Register")'
+    )
+    description = models.TextField(
+        blank=True,
+        help_text='Plan description and features'
+    )
+    monthly_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Monthly subscription price'
+    )
+    features = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Plan features as JSON (e.g., {"max_devices": 5, "inventory": true})'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this plan is available for selection'
+    )
+    sort_order = models.IntegerField(
+        default=0,
+        help_text='Display order (lower numbers appear first)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_saascatalogitem'
+        verbose_name = 'SaaS Catalog Item'
+        verbose_name_plural = 'SaaS Catalog Items'
+        ordering = ['sort_order', 'plan_name']
+
+    def __str__(self):
+        return f"{self.plan_name} (${self.monthly_price}/month)"
+
+
+class ProposedSaaS(models.Model):
+    """SaaS plans proposed for a specific analysis"""
+
+    analysis = models.ForeignKey(
+        'Analysis',
+        on_delete=models.CASCADE,
+        related_name='proposed_saas',
+        help_text='Analysis this SaaS proposal belongs to'
+    )
+    saas_plan = models.ForeignKey(
+        SaaSCatalogItem,
+        on_delete=models.PROTECT,
+        related_name='proposals',
+        help_text='SaaS plan from the catalog'
+    )
+    quantity = models.IntegerField(
+        default=1,
+        help_text='Number of subscriptions/additional devices'
+    )
+    monthly_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Total monthly cost for this SaaS item'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Additional notes about this SaaS proposal'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_proposedsaas'
+        verbose_name = 'Proposed SaaS'
+        verbose_name_plural = 'Proposed SaaS'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['analysis', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.saas_plan.plan_name} x{self.quantity} - Analysis {self.analysis.id}"
+
+
+class OneTimeFee(models.Model):
+    """One-time fees for a specific analysis"""
+
+    FEE_TYPE_CHOICES = [
+        ('APPLICATION', 'Application Fee'),
+        ('DEPLOYMENT', 'Deployment Fee'),
+        ('SHIPPING', 'Shipping Fee'),
+        ('INSURANCE', 'Insurance Fee'),
+        ('SETUP', 'Setup Fee'),
+        ('OTHER', 'Other Fee'),
+    ]
+
+    analysis = models.ForeignKey(
+        'Analysis',
+        on_delete=models.CASCADE,
+        related_name='onetime_fees',
+        help_text='Analysis this fee belongs to'
+    )
+    fee_type = models.CharField(
+        max_length=20,
+        choices=FEE_TYPE_CHOICES,
+        help_text='Type of one-time fee'
+    )
+    fee_name = models.CharField(
+        max_length=255,
+        help_text='Name/description of the fee'
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Fee amount in dollars'
+    )
+    is_optional = models.BooleanField(
+        default=False,
+        help_text='Whether this fee is optional'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Additional notes about this fee'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'analyses_onetimefee'
+        verbose_name = 'One-Time Fee'
+        verbose_name_plural = 'One-Time Fees'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['analysis', 'fee_type']),
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.fee_name} (${self.amount}) - Analysis {self.analysis.id}"

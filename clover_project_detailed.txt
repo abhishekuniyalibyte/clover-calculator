@@ -1,0 +1,118 @@
+# Clover Payment Analysis Platform - Development Progress Log
+
+## Project Overview
+Backend Django application for Blockpay agents to analyze merchant payment processing costs and generate Clover proposals.
+Tech Stack: Django + Django REST Framework + PostgreSQL
+My Scope: Backend only (separate Flutter developer handles frontend)
+
+================================================================================
+
+## February 7, 2026
+
+I have successfully completed the initial backend setup. First, I established a three-tier user hierarchy system where a Superuser can create Admin accounts, and Admins can create Agent accounts. This ensures proper access control and role-based permissions throughout the system.
+
+I built the complete Merchant and Analysis Management system. This includes three core database models (Merchant, Competitor, and Analysis), along with all necessary API endpoints for creating, reading, updating, and deleting records. I implemented proper authentication using JWT tokens, automatic user assignment, and role-based permissions to ensure agents can only access their own data while admins have full visibility.
+
+The system also includes a fully configured Django admin panel where authorized users can manage all data through a web interface. We created and applied all database migrations, implemented data validation, and set up proper serializers to handle API requests and responses efficiently.
+
+All functionality has been tested and verified working correctly, including merchant creation, competitor management, analysis tracking with detailed financial metrics (processing rates, fees, transaction volumes), and proper data relationships between merchants, competitors, and analyses. The API returns paginated results with lightweight data for list views and detailed nested information for individual records.
+
+Additionally, I implemented the Statement Upload and PDF Extraction system. This allows agents to upload merchant processing statements as PDF files, which are then automatically processed to extract key business data. The extraction engine uses regex pattern matching to pull out critical information like business names, processing volumes, fee amounts, and transaction counts. Each uploaded statement is securely stored and linked to its merchant and the uploading user.
+
+**Key Files Modified:**
+- backend/apps/accounts/ (User model, permissions, JWT auth)
+- backend/apps/analyses/ (Merchant, Competitor, Analysis models + APIs)
+- backend/apps/statements/ (Statement upload, PDF extraction)
+
+================================================================================
+
+## February 9, 2026
+
+Today I completed the Pricing and Proposal System - the core of Blockpay proposal generation. I built 7 new database models, 14 RESTful API endpoints, and full admin interfaces.
+
+The system tracks merchant's current hardware costs (POS terminals, card readers, software), supports 4 Blockpay pricing models (Cost-Plus, iPlus, Discount Rate, Flat Rate), manages admin-controlled catalogs for Clover devices and SaaS plans (with lease/purchase pricing), and handles one-time fees (application, deployment, shipping, insurance).
+
+**API Testing and Verification:**
+I created comprehensive test scripts (test_endpoints.py and test_endpoints.sh) to verify all API functionality. During testing, I fixed URL configuration issues - the authentication endpoints are properly routed at `/api/v1/auth/` (not `/api/v1/accounts/`). The login endpoint returns JWT tokens in a nested structure under `response['tokens']['access']`.
+
+Successfully tested all 14 new endpoints with 19 total test cases achieving 100% pass rate:
+- Device Catalog endpoints (list, detail)
+- SaaS Catalog endpoints (list, detail)
+- Merchant Hardware CRUD (create, list, detail, update, delete)
+- Pricing Model CRUD (create, list, detail, delete)
+- Proposed Device CRUD (create, list, detail, delete)
+- Proposed SaaS CRUD (create, list, detail, delete)
+- One-Time Fee CRUD (create, list, detail, delete)
+
+All endpoints working correctly with proper role-based permissions - agents access only their own data, admins see everything. Comprehensive validation ensures data integrity (ownership checks, positive amounts, price ranges). Database migrations applied successfully. Test scripts organized into backend/scripts/ directory for future regression testing.
+
+**Files Modified:** models.py, serializers.py, views.py, urls.py, admin.py (all in backend/apps/analyses/)
+**Files Created:** backend/scripts/test_endpoints.py, backend/scripts/test_endpoints.sh
+
+================================================================================
+
+## Next Steps
+
+**Phase 1: Foundation ✓ COMPLETED**
+- ✓ User hierarchy system (Superuser → Admin → Agent)
+- ✓ Merchant and Analysis Management (models, APIs, admin panel)
+- ✓ Statement Upload and PDF Extraction
+- ✓ Pricing and Proposal System (7 models, 14 endpoints)
+- ✓ End-to-end API testing (100% pass rate)
+
+**Phase 2: Data Population & Calculation Engine (CURRENT FOCUS)**
+- Populate DeviceCatalogItem with real Clover hardware:
+  - Clover Mini, Station, Station Duo, Flex, Go
+  - Card readers, accessories, peripherals
+  - Accurate lease and purchase pricing for each device
+- Populate SaaSCatalogItem with actual Clover subscription plans:
+  - Starter, Standard, Advanced, Register Lite plans
+  - Correct monthly pricing and feature details
+- Build calculation engine:
+  - Compute merchant's current total costs (hardware + processing fees)
+  - Calculate Blockpay proposal costs (devices + SaaS + processing + one-time fees)
+  - Generate savings comparison (current vs. proposed)
+  - Support all 4 pricing models (Cost-Plus, iPlus, Discount Rate, Flat Rate)
+- Add calculated fields to Analysis model or create separate Calculation model
+- Test complete workflow: merchant → analysis → hardware → pricing → devices → SaaS → fees → calculations
+
+**Phase 3: Frontend-Ready APIs**
+- Analysis Summary API: return complete analysis with all relationships (merchant, competitors, hardware, pricing, devices, SaaS, fees, calculations)
+- Statement Review API: formatted extracted data from uploaded PDFs
+- Dashboard API: agent's recent analyses, pending tasks, summary stats
+- Cost Breakdown API: chart-ready data for visualizations (pie charts, bar charts)
+- Proposal Preview API: all data needed to display proposal before PDF generation
+- Ensure all APIs return data in Flutter-friendly format (proper nesting, clean field names)
+
+**Phase 4: PDF Proposal Generation**
+- Design professional Blockpay proposal template
+- Install PDF generation library (ReportLab or WeasyPrint)
+- Build PDF generator that includes:
+  - Executive summary with savings highlight
+  - Current processing costs breakdown
+  - Proposed Blockpay solution details
+  - Device and SaaS recommendations
+  - Pricing model comparison table
+  - Total costs and savings summary
+- Create API endpoint to generate and download proposal PDF
+- Store generated PDFs linked to Analysis records
+
+**Phase 5: Polish & Production Prep**
+- Write comprehensive API documentation for Flutter developer
+- Add endpoint descriptions, request/response examples, error codes
+- Create Postman collection or OpenAPI/Swagger docs
+- Implement audit logging for admin actions
+- Add data export functionality (CSV, Excel)
+- Write unit tests for calculation engine
+- Integration tests for complete workflows
+- Configure production settings (DEBUG=False, ALLOWED_HOSTS, etc.)
+- Set up environment variables for secrets
+- Database backup strategy
+
+**Phase 6: Advanced Features (Future Enhancements)**
+- Enhanced PDF extraction using AI/ML (OCR for scanned statements)
+- Real-time sync APIs for mobile/web collaboration
+- Email notifications for proposal generation
+- Proposal versioning and history tracking
+- Custom branding options for proposals
+- Advanced analytics and reporting for admins
