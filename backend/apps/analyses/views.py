@@ -1,7 +1,12 @@
 from rest_framework import generics, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+
+from .calculators import AnalysisCalculator
 
 from .models import (
     Merchant, Competitor, Analysis,
@@ -483,3 +488,142 @@ class OneTimeFeeDetailView(generics.RetrieveUpdateDestroyAPIView):
         if user.is_superuser or user.role == 'ADMIN':
             return OneTimeFee.objects.all().select_related('analysis')
         return OneTimeFee.objects.filter(analysis__user=user).select_related('analysis')
+
+
+# ===== Calculation View =====
+
+class AnalysisCalculateView(APIView):
+    """
+    Compute on-the-fly cost comparison for a given analysis.
+    GET /api/v1/analyses/{id}/calculate/
+
+    Returns:
+    - current_costs: what the merchant currently pays
+    - proposed_costs: what they would pay under Blockpay
+    - onetime_costs: one-time purchase/fee totals
+    - savings: monthly, yearly, and timeframe breakdown
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('merchant').prefetch_related(
+                'hardware_costs',
+                'pricing_models',
+                'proposed_devices',
+                'proposed_saas',
+                'onetime_fees',
+            ),
+            pk=pk
+        )
+
+        # Agents can only see their own analyses; admins/superusers see all
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to view this analysis.")
+
+        calculator = AnalysisCalculator(analysis)
+        report = calculator.get_full_report()
+        return Response(report)
+
+
+class AnalysisImportFromStatementView(APIView):
+    """
+    Auto-populate Analysis fields from the linked statement's extracted data.
+    POST /api/v1/analyses/{id}/import-from-statement/
+
+    Copies StatementData → Analysis fields:
+      total_volume         → monthly_volume
+      effective_rate       → current_processing_rate
+      monthly_fees         → current_monthly_fees
+      transaction_count    → monthly_transaction_count
+      interchange_fees     → interchange_total
+      interac_count        → interac_txn_count
+      visa_volume          → visa_volume
+      mastercard_volume    → mc_volume
+      amex_volume          → amex_volume
+
+    Only overwrites fields that have a non-zero extracted value.
+    Returns the updated analysis fields so the frontend can refresh.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        analysis = get_object_or_404(Analysis, pk=pk)
+
+        # Ownership check
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to modify this analysis.")
+
+        # Must have a linked statement
+        if not analysis.statement:
+            return Response(
+                {'error': 'This analysis has no linked statement. Please link a statement first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Statement must be processed
+        stmt = analysis.statement
+        if stmt.status != 'COMPLETED':
+            return Response(
+                {'error': f'Statement is not yet processed (status: {stmt.status}). Please wait for processing to complete.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get the extracted StatementData
+        try:
+            data = stmt.data
+        except Exception:
+            return Response(
+                {'error': 'No extracted data found for this statement. Processing may have failed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        imported = {}
+
+        # Map StatementData → Analysis (only overwrite if extracted value is meaningful)
+        if data.total_volume and data.total_volume > 0:
+            analysis.monthly_volume = data.total_volume
+            imported['monthly_volume'] = float(data.total_volume)
+
+        if data.effective_rate and data.effective_rate > 0:
+            analysis.current_processing_rate = round(data.effective_rate, 2)
+            imported['current_processing_rate'] = float(analysis.current_processing_rate)
+
+        if data.monthly_fees and data.monthly_fees > 0:
+            analysis.current_monthly_fees = data.monthly_fees
+            imported['current_monthly_fees'] = float(data.monthly_fees)
+
+        if data.transaction_count and data.transaction_count > 0:
+            analysis.monthly_transaction_count = data.transaction_count
+            imported['monthly_transaction_count'] = data.transaction_count
+
+        if data.interchange_fees and data.interchange_fees > 0:
+            analysis.interchange_total = data.interchange_fees
+            imported['interchange_total'] = float(data.interchange_fees)
+
+        if data.interac_count and data.interac_count > 0:
+            analysis.interac_txn_count = data.interac_count
+            imported['interac_txn_count'] = data.interac_count
+
+        if data.visa_volume and data.visa_volume > 0:
+            analysis.visa_volume = data.visa_volume
+            imported['visa_volume'] = float(data.visa_volume)
+
+        if data.mastercard_volume and data.mastercard_volume > 0:
+            analysis.mc_volume = data.mastercard_volume
+            imported['mc_volume'] = float(data.mastercard_volume)
+
+        if data.amex_volume and data.amex_volume > 0:
+            analysis.amex_volume = data.amex_volume
+            imported['amex_volume'] = float(data.amex_volume)
+
+        analysis.save()
+
+        return Response({
+            'success': True,
+            'analysis_id': analysis.id,
+            'fields_imported': imported,
+            'message': f'{len(imported)} field(s) imported from statement.',
+        }, status=status.HTTP_200_OK)

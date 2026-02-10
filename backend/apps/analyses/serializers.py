@@ -72,8 +72,10 @@ class AnalysisDetailSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_name', 'merchant', 'merchant_details',
             'statement', 'competitor', 'competitor_details', 'status', 'status_display',
             'current_processing_rate', 'current_monthly_fees', 'current_transaction_fees',
-            'monthly_volume', 'monthly_transaction_count', 'notes',
-            'created_at', 'updated_at'
+            'monthly_volume', 'monthly_transaction_count',
+            'interchange_total', 'interac_txn_count',
+            'visa_volume', 'mc_volume', 'amex_volume',
+            'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'user_name', 'created_at', 'updated_at']
 
@@ -92,7 +94,10 @@ class AnalysisCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'merchant', 'statement', 'competitor', 'status',
             'current_processing_rate', 'current_monthly_fees', 'current_transaction_fees',
-            'monthly_volume', 'monthly_transaction_count', 'notes'
+            'monthly_volume', 'monthly_transaction_count',
+            'interchange_total', 'interac_txn_count',
+            'visa_volume', 'mc_volume', 'amex_volume',
+            'notes'
         ]
 
     def validate_merchant(self, value):
@@ -106,7 +111,7 @@ class AnalysisCreateUpdateSerializer(serializers.ModelSerializer):
         """Ensure user can only link their own statements"""
         if value:
             request = self.context.get('request')
-            if value.user != request.user and not request.user.is_superuser and request.user.role != 'ADMIN':
+            if value.created_by != request.user and not request.user.is_superuser and request.user.role != 'ADMIN':
                 raise serializers.ValidationError("You can only link your own statements.")
         return value
 
@@ -166,8 +171,12 @@ class PricingModelSerializer(serializers.ModelSerializer):
         model = PricingModel
         fields = [
             'id', 'analysis', 'model_type', 'model_type_display', 'is_selected',
-            'markup_percent', 'basis_points', 'discount_rate', 'per_transaction_fee',
-            'monthly_fee', 'notes', 'created_at', 'updated_at'
+            'markup_percent', 'card_brand_fee_percent', 'basis_points',
+            'visa_rate', 'mc_rate', 'amex_rate',
+            'discount_rate', 'billback_rate', 'nonqualified_pct',
+            'per_transaction_fee', 'monthly_fee',
+            'surcharge_rate', 'program_discount_rate',
+            'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

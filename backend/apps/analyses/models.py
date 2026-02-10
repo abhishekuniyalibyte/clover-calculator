@@ -170,7 +170,42 @@ class Analysis(models.Model):
     monthly_transaction_count = models.IntegerField(
         null=True,
         blank=True,
-        help_text='Number of transactions per month'
+        help_text='Total number of credit transactions per month'
+    )
+
+    # Extended statement data — for model-specific accurate calculations
+    interchange_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly interchange (pass-through) total in dollars — from statement (used in Cost Plus / iPlus proposals)'
+    )
+    interac_txn_count = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of Interac debit transactions per month ($0.04/txn in Blockpay proposals)'
+    )
+    visa_volume = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly Visa credit volume in dollars (for Discount Rate per-brand calculation)'
+    )
+    mc_volume = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly Mastercard credit volume in dollars (for Discount Rate per-brand calculation)'
+    )
+    amex_volume = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly Amex volume in dollars (for Discount Rate per-brand calculation)'
     )
 
     # Analysis notes
@@ -297,8 +332,8 @@ class PricingModel(models.Model):
     MODEL_TYPE_CHOICES = [
         ('COST_PLUS', 'Cost-Plus (Interchange+)'),
         ('I_PLUS', 'iPlus'),
-        ('DISCOUNT_RATE', 'Discount Rate'),
-        ('FLAT', 'Flat Rate'),
+        ('DISCOUNT_RATE', 'Discount Rate (Billback)'),
+        ('SURCHARGE', 'Surcharge Program'),
     ]
 
     analysis = models.ForeignKey(
@@ -316,42 +351,106 @@ class PricingModel(models.Model):
         default=False,
         help_text='Whether this is the selected pricing model for the proposal'
     )
+    # --- Cost Plus / iPlus fields ---
     markup_percent = models.DecimalField(
         max_digits=5,
-        decimal_places=2,
+        decimal_places=3,
         null=True,
         blank=True,
-        help_text='Markup percentage for cost-plus/iPlus (e.g., 0.50 for 0.5%)'
+        help_text='Blockpay markup % on credit volume. Cost Plus default: 0.10%; iPlus default: 0.25%'
+    )
+    card_brand_fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Card brand fee % on credit volume (Cost Plus only). Default: 0.15%. Do NOT use for iPlus.'
     )
     basis_points = models.IntegerField(
         null=True,
         blank=True,
-        help_text='Basis points markup for cost-plus model'
+        help_text='Markup in basis points (informational; 10 bps = 0.10%)'
+    )
+
+    # --- Discount Rate (Billback) fields ---
+    visa_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Visa base discount rate %. Blockpay default: 1.36%'
+    )
+    mc_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Mastercard base discount rate %. Blockpay default: 1.38%'
+    )
+    amex_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Amex base discount rate %. Blockpay default: 2.65%'
     )
     discount_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Fallback discount rate % if per-brand rates (visa_rate/mc_rate/amex_rate) are not set'
+    )
+    billback_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Non-qualified/billback surcharge % on non-qualifying transactions. Default: 0.25%'
+    )
+    nonqualified_pct = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text='Discount rate percentage (e.g., 2.50 for 2.5%)'
+        help_text='Estimated % of monthly volume that is non-qualified (keyed, CNP, premium). e.g., 15 for 15%'
     )
+
+    # --- Shared per-item and fixed fields ---
     per_transaction_fee = models.DecimalField(
         max_digits=6,
         decimal_places=4,
         null=True,
         blank=True,
-        help_text='Per-transaction fee in dollars (e.g., 0.10 for $0.10)'
+        help_text='Interac debit per-transaction fee in dollars. Blockpay default: $0.04'
     )
     monthly_fee = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text='Monthly fee in dollars'
+        help_text='Fixed monthly fee in dollars (account fee, PCI program, etc.)'
     )
+
+    # --- Surcharge Program fields ---
+    surcharge_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Surcharge % charged to cardholder on eligible credit transactions (e.g., 2.40)'
+    )
+    program_discount_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Program discount % billed to merchant on total ticket (sale + surcharge). e.g., 2.343'
+    )
+
     notes = models.TextField(
         blank=True,
-        help_text='Additional notes about this pricing model'
+        help_text='Additional notes, assumptions used, or override justification'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

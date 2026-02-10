@@ -84,6 +84,8 @@ class StatementData(models.Model):
     amex_count = models.IntegerField(default=0)
     discover_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     discover_count = models.IntegerField(default=0)
+    interac_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    interac_count = models.IntegerField(default=0)
 
     # Fees from current processor
     interchange_fees = models.DecimalField(max_digits=12, decimal_places=2, default=0)

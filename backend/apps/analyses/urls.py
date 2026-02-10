@@ -23,6 +23,8 @@ from .views import (
     ProposedSaaSDetailView,
     OneTimeFeeListCreateView,
     OneTimeFeeDetailView,
+    AnalysisCalculateView,
+    AnalysisImportFromStatementView,
 )
 
 app_name = 'analyses'
@@ -40,6 +42,8 @@ urlpatterns = [
     # Analysis endpoints
     path('', AnalysisListCreateView.as_view(), name='analysis_list_create'),
     path('<int:pk>/', AnalysisDetailView.as_view(), name='analysis_detail'),
+    path('<int:pk>/calculate/', AnalysisCalculateView.as_view(), name='analysis_calculate'),
+    path('<int:pk>/import-from-statement/', AnalysisImportFromStatementView.as_view(), name='analysis_import_from_statement'),
 
     # Merchant Hardware endpoints
     path('hardware/', MerchantHardwareListCreateView.as_view(), name='hardware_list_create'),

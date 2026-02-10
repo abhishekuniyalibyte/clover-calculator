@@ -163,6 +163,7 @@ class StatementProcessingService:
         mc_data = card_volumes.get('mastercard', {})
         amex_data = card_volumes.get('amex', {})
         discover_data = card_volumes.get('discover', {})
+        interac_data = card_volumes.get('interac', {})
 
         # Get fees
         fees = extracted_data.get('fees', {})
@@ -190,6 +191,8 @@ class StatementProcessingService:
                 'amex_count': amex_data.get('count', 0),
                 'discover_volume': discover_data.get('volume', Decimal('0.00')),
                 'discover_count': discover_data.get('count', 0),
+                'interac_volume': interac_data.get('volume', Decimal('0.00')),
+                'interac_count': interac_data.get('count', 0),
 
                 # Fees
                 'interchange_fees': fees.get('interchange_fees', Decimal('0.00')),
