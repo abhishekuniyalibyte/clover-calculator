@@ -1,0 +1,116 @@
+{% extends "fastapi_admin/base.html" %}
+{% set title = "Admin - Edit Merchant" %}
+{% set active = "merchants" %}
+
+{% block content %}
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; gap: 12px; align-items:center; flex-wrap: wrap;">
+      <div>
+        <div style="font-weight:700;">Edit Merchant #{{ merchant.id }}</div>
+        <div class="muted">{{ merchant.business_name }}</div>
+      </div>
+      <div class="actions">
+        <a class="pill" href="/admin/merchants">← Back to Merchants</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <form id="editForm">
+      <div class="row" style="margin-bottom: 10px;">
+        <div>
+          <label>User</label>
+          <select name="user_id" disabled>
+            {% for u in users %}
+              <option value="{{ u.id }}" {% if u.id == merchant.user_id %}selected{% endif %}>
+                {{ u.id }} — {{ u.username }}{% if u.email %} ({{ u.email }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div class="hint" style="margin-top: 6px;">User is read-only in this demo UI.</div>
+        </div>
+        <div>
+          <label>Business Name</label>
+          <input name="business_name" required value="{{ merchant.business_name }}" />
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <label>Business Address</label>
+        <input name="business_address" value="{{ merchant.business_address }}" />
+      </div>
+
+      <div class="row" style="margin-bottom: 10px;">
+        <div>
+          <label>Contact Name</label>
+          <input name="contact_name" value="{{ merchant.contact_name }}" />
+        </div>
+        <div>
+          <label>Contact Email</label>
+          <input name="contact_email" value="{{ merchant.contact_email }}" />
+        </div>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <label>Contact Phone</label>
+        <input name="contact_phone" value="{{ merchant.contact_phone }}" />
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <label>Notes</label>
+        <textarea name="notes">{{ merchant.notes }}</textarea>
+      </div>
+
+      <div class="actions">
+        <button class="primary" type="submit">Save Changes</button>
+      </div>
+    </form>
+    <div id="editError" class="hint" style="margin-top: 10px; color: var(--danger); display:none;"></div>
+  </div>
+
+  <script>
+    function qs(name) {
+      return document.querySelector(`[name="${name}"]`);
+    }
+
+    function showEditError(text) {
+      const el = document.getElementById("editError");
+      el.textContent = text || "Unknown error";
+      el.style.display = "block";
+    }
+
+    function clearEditError() {
+      const el = document.getElementById("editError");
+      el.textContent = "";
+      el.style.display = "none";
+    }
+
+    document.getElementById("editForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearEditError();
+
+      const payload = {
+        business_name: qs("business_name").value,
+        business_address: qs("business_address").value || "",
+        contact_name: qs("contact_name").value || "",
+        contact_email: qs("contact_email").value || "",
+        contact_phone: qs("contact_phone").value || "",
+        notes: qs("notes").value || "",
+      };
+
+      const res = await fetch(`/merchants/{{ merchant.id }}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        showEditError(text);
+        return;
+      }
+
+      window.location.href = "/admin/merchants?message=Updated";
+    });
+  </script>
+{% endblock %}

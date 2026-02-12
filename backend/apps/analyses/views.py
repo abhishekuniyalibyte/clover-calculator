@@ -527,6 +527,347 @@ class AnalysisCalculateView(APIView):
         return Response(report)
 
 
+# ===== Phase 3: Frontend-Ready API Views =====
+
+class AnalysisSummaryView(APIView):
+    """
+    Complete analysis snapshot in one shot — merchant, competitor, statement,
+    hardware, pricing, devices, SaaS, fees, AND calculated cost comparison.
+    GET /api/v1/analyses/{id}/summary/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('merchant', 'competitor', 'statement')
+            .prefetch_related(
+                'hardware_costs',
+                'pricing_models',
+                'proposed_devices__device',
+                'proposed_saas__saas_plan',
+                'onetime_fees',
+            ),
+            pk=pk
+        )
+
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to view this analysis.")
+
+        calculator = AnalysisCalculator(analysis)
+        report = calculator.get_full_report()
+
+        response_data = {
+            'analysis_id': analysis.id,
+            'status': analysis.status,
+            'created_at': analysis.created_at,
+            'updated_at': analysis.updated_at,
+            'notes': analysis.notes,
+            'merchant': {
+                'id': analysis.merchant.id,
+                'business_name': analysis.merchant.business_name,
+                'business_address': analysis.merchant.business_address,
+                'contact_name': analysis.merchant.contact_name,
+                'contact_email': analysis.merchant.contact_email,
+                'contact_phone': analysis.merchant.contact_phone,
+            },
+            'competitor': {
+                'id': analysis.competitor.id,
+                'name': analysis.competitor.name,
+                'logo_url': request.build_absolute_uri(analysis.competitor.logo.url) if analysis.competitor.logo else None,
+            } if analysis.competitor else None,
+            'statement': {
+                'id': analysis.statement.id,
+                'status': analysis.statement.status,
+                'extraction_confidence': float(analysis.statement.extraction_confidence) if analysis.statement.extraction_confidence else None,
+                'merchant_name': analysis.statement.merchant_name,
+                'processor_name': analysis.statement.processor_name,
+            } if analysis.statement else None,
+            'hardware': [
+                {
+                    'id': hw.id,
+                    'item_name': hw.item_name,
+                    'item_type': hw.item_type,
+                    'provider': hw.provider,
+                    'cost_type': hw.cost_type,
+                    'amount': float(hw.amount),
+                    'quantity': hw.quantity,
+                    'monthly_cost': float(hw.amount * hw.quantity) if hw.cost_type in ('MONTHLY_LEASE', 'MONTHLY_SUBSCRIPTION') else 0,
+                }
+                for hw in analysis.hardware_costs.all()
+            ],
+            'pricing_model': None,
+            'proposed_devices': [
+                {
+                    'id': pd.id,
+                    'device_name': pd.device.name,
+                    'device_image_url': request.build_absolute_uri(pd.device.image.url) if pd.device.image else None,
+                    'quantity': pd.quantity,
+                    'pricing_type': pd.pricing_type,
+                    'selected_price': float(pd.selected_price),
+                    'total_cost': float(pd.total_cost),
+                }
+                for pd in analysis.proposed_devices.all()
+            ],
+            'proposed_saas': [
+                {
+                    'id': ps.id,
+                    'plan_name': ps.saas_plan.plan_name,
+                    'quantity': ps.quantity,
+                    'monthly_cost': float(ps.monthly_cost),
+                }
+                for ps in analysis.proposed_saas.all()
+            ],
+            'onetime_fees': [
+                {
+                    'id': fee.id,
+                    'fee_name': fee.fee_name,
+                    'fee_type': fee.fee_type,
+                    'amount': float(fee.amount),
+                    'is_optional': fee.is_optional,
+                }
+                for fee in analysis.onetime_fees.all()
+            ],
+            'calculation': report,
+        }
+
+        selected_pricing = calculator.selected_pricing
+        if selected_pricing:
+            response_data['pricing_model'] = {
+                'id': selected_pricing.id,
+                'model_type': selected_pricing.model_type,
+                'display_name': selected_pricing.get_model_type_display(),
+                'is_selected': selected_pricing.is_selected,
+                'markup_percent': float(selected_pricing.markup_percent) if selected_pricing.markup_percent else None,
+                'per_transaction_fee': float(selected_pricing.per_transaction_fee) if selected_pricing.per_transaction_fee else None,
+                'monthly_fee': float(selected_pricing.monthly_fee) if selected_pricing.monthly_fee else None,
+            }
+
+        return Response(response_data)
+
+
+class CostBreakdownView(APIView):
+    """
+    Chart-ready cost breakdown data for visualizations (pie charts, bar charts).
+    GET /api/v1/analyses/{id}/cost-breakdown/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('merchant').prefetch_related(
+                'hardware_costs',
+                'pricing_models',
+                'proposed_devices',
+                'proposed_saas',
+                'onetime_fees',
+            ),
+            pk=pk
+        )
+
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to view this analysis.")
+
+        calculator = AnalysisCalculator(analysis)
+        current = calculator.calculate_current_costs()
+        proposed = calculator.calculate_proposed_costs()
+        onetime = calculator.calculate_onetime_costs()
+        savings = calculator.calculate_savings(
+            current['total_monthly'],
+            proposed['total_monthly'],
+            onetime['total'],
+        )
+
+        current_total = current['total_monthly']
+        proposed_total = proposed['total_monthly']
+
+        # Pie chart breakdown — competitor (current) costs
+        competitor_breakdown = []
+        for label, amount in [
+            ('Processing Fees', current['processing_cost']),
+            ('Per-Transaction Fees', current['per_transaction_cost']),
+            ('Monthly Fees', current['monthly_fees']),
+            ('Hardware / Software', current['hardware_monthly']),
+        ]:
+            if amount > 0:
+                competitor_breakdown.append({
+                    'label': label,
+                    'amount': amount,
+                    'percentage': round(amount / current_total * 100, 1) if current_total > 0 else 0,
+                })
+
+        # Pie chart breakdown — Blockpay (proposed) costs
+        blockpay_breakdown = []
+        for label, amount in [
+            ('Processing Fees', proposed['processing_cost']),
+            ('Device Lease', proposed['device_monthly']),
+            ('SaaS Plans', proposed['saas_monthly']),
+        ]:
+            if amount > 0:
+                blockpay_breakdown.append({
+                    'label': label,
+                    'amount': amount,
+                    'percentage': round(amount / proposed_total * 100, 1) if proposed_total > 0 else 0,
+                })
+
+        return Response({
+            'analysis_id': analysis.id,
+            'competitor_costs': {
+                'total': current_total,
+                'breakdown': competitor_breakdown,
+            },
+            'blockpay_costs': {
+                'total': proposed_total,
+                'breakdown': blockpay_breakdown,
+            },
+            'one_time_costs': {
+                'total': onetime['total'],
+                'device_purchase': onetime['device_purchase'],
+                'required_fees': onetime['required_fees'],
+                'optional_fees': onetime['optional_fees'],
+            },
+            'savings': {
+                'monthly': savings['monthly'],
+                'yearly': savings['yearly'],
+                'percentage': savings['percent'],
+                'break_even_months': savings['break_even_months'],
+            },
+            'savings_timeline': [
+                {'period': 'daily',     'label': 'Daily',     'amount': savings['daily']},
+                {'period': 'weekly',    'label': 'Weekly',    'amount': savings['weekly']},
+                {'period': 'monthly',   'label': 'Monthly',   'amount': savings['monthly']},
+                {'period': 'quarterly', 'label': 'Quarterly', 'amount': savings['quarterly']},
+                {'period': 'yearly',    'label': 'Yearly',    'amount': savings['yearly']},
+            ],
+            'bar_chart': {
+                'labels': ['Processing', 'Per-Transaction', 'Monthly Fees', 'Hardware', 'Device Lease', 'SaaS'],
+                'competitor': [
+                    current['processing_cost'],
+                    current['per_transaction_cost'],
+                    current['monthly_fees'],
+                    current['hardware_monthly'],
+                    0,
+                    0,
+                ],
+                'blockpay': [
+                    proposed['processing_cost'],
+                    0,
+                    0,
+                    0,
+                    proposed['device_monthly'],
+                    proposed['saas_monthly'],
+                ],
+            },
+        })
+
+
+class ProposalPreviewView(APIView):
+    """
+    Full proposal preview — all data needed for the Review Summary Screen (step 16)
+    and as input for PDF generation (step 18).
+    GET /api/v1/analyses/{id}/proposal-preview/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('merchant', 'competitor', 'statement')
+            .prefetch_related(
+                'hardware_costs',
+                'pricing_models',
+                'proposed_devices__device',
+                'proposed_saas__saas_plan',
+                'onetime_fees',
+            ),
+            pk=pk
+        )
+
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to view this analysis.")
+
+        calculator = AnalysisCalculator(analysis)
+        current = calculator.calculate_current_costs()
+        proposed = calculator.calculate_proposed_costs()
+        onetime = calculator.calculate_onetime_costs()
+        savings = calculator.calculate_savings(
+            current['total_monthly'],
+            proposed['total_monthly'],
+            onetime['total'],
+        )
+        selected_pricing = calculator.selected_pricing
+
+        return Response({
+            'analysis_id': analysis.id,
+            'status': analysis.status,
+            'merchant': {
+                'id': analysis.merchant.id,
+                'business_name': analysis.merchant.business_name,
+                'business_address': analysis.merchant.business_address,
+            },
+            'competitor': {
+                'id': analysis.competitor.id,
+                'name': analysis.competitor.name,
+                'logo_url': request.build_absolute_uri(analysis.competitor.logo.url) if analysis.competitor.logo else None,
+                'current_monthly_cost': current['total_monthly'],
+            } if analysis.competitor else None,
+            'blockpay_proposal': {
+                'pricing_model': {
+                    'type': selected_pricing.model_type,
+                    'display_name': selected_pricing.get_model_type_display(),
+                    'markup_percent': float(selected_pricing.markup_percent) if selected_pricing.markup_percent else None,
+                    'per_transaction_fee': float(selected_pricing.per_transaction_fee) if selected_pricing.per_transaction_fee else None,
+                    'monthly_fee': float(selected_pricing.monthly_fee) if selected_pricing.monthly_fee else None,
+                    'processing_cost': proposed['processing_cost'],
+                } if selected_pricing else None,
+                'devices': [
+                    {
+                        'id': pd.device.id,
+                        'name': pd.device.name,
+                        'category': pd.device.category,
+                        'image_url': request.build_absolute_uri(pd.device.image.url) if pd.device.image else None,
+                        'quantity': pd.quantity,
+                        'pricing_type': pd.pricing_type,
+                        'monthly_cost': float(pd.total_cost) if pd.pricing_type == 'LEASE' else 0,
+                        'one_time_cost': float(pd.total_cost) if pd.pricing_type == 'PURCHASE' else 0,
+                    }
+                    for pd in analysis.proposed_devices.all()
+                ],
+                'saas_plans': [
+                    {
+                        'id': ps.saas_plan.id,
+                        'plan_name': ps.saas_plan.plan_name,
+                        'quantity': ps.quantity,
+                        'monthly_cost': float(ps.monthly_cost),
+                    }
+                    for ps in analysis.proposed_saas.all()
+                ],
+                'one_time_fees': [
+                    {
+                        'id': fee.id,
+                        'fee_name': fee.fee_name,
+                        'fee_type': fee.fee_type,
+                        'amount': float(fee.amount),
+                        'is_optional': fee.is_optional,
+                    }
+                    for fee in analysis.onetime_fees.all()
+                ],
+                'total_monthly': proposed['total_monthly'],
+                'total_one_time': onetime['total'],
+            },
+            'savings_summary': {
+                'monthly': savings['monthly'],
+                'yearly': savings['yearly'],
+                'percentage': savings['percent'],
+                'break_even_months': savings['break_even_months'],
+                'daily': savings['daily'],
+                'weekly': savings['weekly'],
+                'quarterly': savings['quarterly'],
+            },
+        })
+
+
 class AnalysisImportFromStatementView(APIView):
     """
     Auto-populate Analysis fields from the linked statement's extracted data.

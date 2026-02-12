@@ -165,3 +165,67 @@ class StatementDetailView(generics.RetrieveAPIView):
         if self.request.user.role == 'ADMIN':
             return MerchantStatement.objects.all()
         return MerchantStatement.objects.filter(created_by=self.request.user)
+
+
+class StatementReviewView(generics.RetrieveAPIView):
+    """
+    Formatted line-by-line statement data for the agent review screen (step 7).
+    Surfaces processing rates, per-transaction fees, monthly fees, and card-brand
+    volume breakdowns in a Flutter-friendly structure.
+    GET /api/v1/statements/{id}/review/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role == 'ADMIN' or self.request.user.is_superuser:
+            return MerchantStatement.objects.all()
+        return MerchantStatement.objects.filter(created_by=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        statement = self.get_object()
+
+        response = {
+            'statement_id': statement.id,
+            'source': statement.source,
+            'status': statement.status,
+            'merchant_name': statement.merchant_name,
+            'processor_name': statement.processor_name,
+            'period': {
+                'start': str(statement.statement_period_start) if statement.statement_period_start else None,
+                'end': str(statement.statement_period_end) if statement.statement_period_end else None,
+            },
+            'extraction_confidence': float(statement.extraction_confidence) if statement.extraction_confidence else None,
+            'requires_review': statement.requires_review,
+            'extraction_notes': statement.extraction_notes,
+            'line_items': None,
+        }
+
+        try:
+            data = statement.data
+            response['line_items'] = {
+                'volumes': {
+                    'total_volume': float(data.total_volume) if data.total_volume else None,
+                    'transaction_count': data.transaction_count,
+                    'card_breakdown': {
+                        'visa':       {'volume': float(data.visa_volume)       if data.visa_volume       else None, 'count': data.visa_count},
+                        'mastercard': {'volume': float(data.mastercard_volume) if data.mastercard_volume else None, 'count': data.mastercard_count},
+                        'amex':       {'volume': float(data.amex_volume)       if data.amex_volume       else None, 'count': data.amex_count},
+                        'discover':   {'volume': float(data.discover_volume)   if data.discover_volume   else None, 'count': data.discover_count},
+                        'interac':    {'volume': float(data.interac_volume)    if data.interac_volume    else None, 'count': data.interac_count},
+                    },
+                },
+                'processing_rates': {
+                    'effective_rate': float(data.effective_rate) if data.effective_rate else None,
+                },
+                'fees': {
+                    'interchange_fees': float(data.interchange_fees) if data.interchange_fees else None,
+                    'assessment_fees':  float(data.assessment_fees)  if data.assessment_fees  else None,
+                    'processing_fees':  float(data.processing_fees)  if data.processing_fees  else None,
+                    'monthly_fees':     float(data.monthly_fees)      if data.monthly_fees      else None,
+                    'other_fees':       float(data.other_fees)        if data.other_fees        else None,
+                },
+            }
+        except StatementData.DoesNotExist:
+            response['line_items'] = None
+
+        return Response(response)

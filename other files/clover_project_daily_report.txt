@@ -145,6 +145,45 @@ Built the Clover Statement Calculation Engine and aligned all pricing logic with
 
 ================================================================================
 
+================================================================================
+
+## February 12, 2026
+
+Built Phase 3 — Frontend-Ready APIs. Added 5 new endpoints to serve the Flutter app with structured, Flutter-friendly data for each screen in the agent workflow.
+
+**New Endpoints:**
+
+1. `GET /api/v1/analyses/{id}/summary/`
+   - One-shot analysis snapshot: merchant, competitor, statement, hardware, pricing model, proposed devices, SaaS plans, one-time fees, and full cost comparison — all in a single response.
+   - Eliminates the need for the Flutter app to make 6+ separate calls to assemble an analysis screen.
+
+2. `GET /api/v1/analyses/{id}/cost-breakdown/`
+   - Chart-ready data for savings visualization (step 13 & 14 in agent workflow).
+   - Returns pie chart breakdowns (competitor costs vs. Blockpay costs with labels + percentages), bar chart arrays (labels, competitor values, blockpay values), savings timeline (daily / weekly / monthly / quarterly / yearly), and one-time cost summary.
+
+3. `GET /api/v1/analyses/{id}/proposal-preview/`
+   - Complete proposal snapshot for the Review Summary Screen (step 16) and PDF generation input (step 18).
+   - Returns merchant, competitor (with current monthly cost), Blockpay proposal (pricing model, devices with images, SaaS plans, one-time fees), and savings summary (all timeframes + break-even).
+
+4. `GET /api/v1/statements/{id}/review/`
+   - Formatted line-by-line statement data for the agent review screen (step 7).
+   - Returns structured line items: volumes (total + card-brand breakdown), processing rates (effective rate), and fees (interchange, assessment, processing, monthly, other).
+
+5. `GET /api/v1/auth/dashboard/`
+   - Agent/Admin dashboard with stats and recent activity.
+   - Agents see their own data. Admins see all-agent data with agent names attached.
+   - Returns: user info, stats (total merchants, total analyses, drafts, submitted), last 5 recent analyses, and up to 5 pending draft tasks.
+
+**Files Modified:**
+- backend/apps/analyses/views.py — added AnalysisSummaryView, CostBreakdownView, ProposalPreviewView
+- backend/apps/analyses/urls.py — registered 3 new routes under /api/v1/analyses/{id}/
+- backend/apps/statements/views.py — added StatementReviewView
+- backend/apps/statements/urls.py — registered /api/v1/statements/{id}/review/
+- backend/apps/accounts/views.py — added DashboardView
+- backend/apps/accounts/urls.py — registered /api/v1/auth/dashboard/
+
+================================================================================
+
 ## Next Steps
 
 **Phase 1: Foundation ✓ COMPLETED**
@@ -171,13 +210,13 @@ Built the Clover Statement Calculation Engine and aligned all pricing logic with
   - ✓ Admin panel cost comparison table with savings summary
 - Test complete workflow: merchant → analysis → hardware → pricing → devices → SaaS → fees → calculations
 
-**Phase 3: Frontend-Ready APIs**
-- Analysis Summary API: return complete analysis with all relationships (merchant, competitors, hardware, pricing, devices, SaaS, fees, calculations)
-- Statement Review API: formatted extracted data from uploaded PDFs
-- Dashboard API: agent's recent analyses, pending tasks, summary stats
-- Cost Breakdown API: chart-ready data for visualizations (pie charts, bar charts)
-- Proposal Preview API: all data needed to display proposal before PDF generation
-- Ensure all APIs return data in Flutter-friendly format (proper nesting, clean field names)
+**Phase 3: Frontend-Ready APIs ✓ COMPLETED**
+- ✓ Analysis Summary API: GET /api/v1/analyses/{id}/summary/
+- ✓ Statement Review API: GET /api/v1/statements/{id}/review/
+- ✓ Dashboard API: GET /api/v1/auth/dashboard/
+- ✓ Cost Breakdown API: GET /api/v1/analyses/{id}/cost-breakdown/
+- ✓ Proposal Preview API: GET /api/v1/analyses/{id}/proposal-preview/
+- ✓ All APIs return Flutter-friendly nested format with proper field names
 
 **Phase 4: PDF Proposal Generation**
 - Design professional Blockpay proposal template
@@ -211,3 +250,31 @@ Built the Clover Statement Calculation Engine and aligned all pricing logic with
 - Proposal versioning and history tracking
 - Custom branding options for proposals
 - Advanced analytics and reporting for admins
+
+================================================================================
+the agent-facing UX workflow — what an agent does when using the app
+
+1. Agent Login — Agent signs in with their own user account (role-based access, tracked).
+2. Create New Analysis — Agent starts a new merchant cost analysis file.
+3. Enter Merchant Info — Business name (DBA), and business address (DBA Address are entered.
+4. Select Competitor — Agent chooses competitor name (competitor logo + name must display in workflow and on PDF).
+5. Upload / Capture Statement (3 options) — Agent provides current statement data via: (a) photo/image, (b) PDF upload, or (c) manual/verbal entry when merchant won’t share statement.
+6. Extract / Input Data — System auto-extracts data from PDF/image (if possible) OR agent manually inputs statement values.
+7. Statement Review (Line-by-Line) — If statement exists, agent reviews line items to identify:
+7.1) Miscellaneous / additional charges competitor applies that we don’t
+7.2) Current processing rate(s) the merchant is paying
+7.3) Per-transaction fees (if available)
+7.4) Monthly/annual account fees (if available)
+8. Capture Existing Hardware / Software Costs — Agent inputs what merchant pays for POS/hardware/software today (if applicable).
+9. Set Blockpay Proposal — Agent selects our pricing model and enters our proposed pricing (rates/fees).
+10. Add Device + SaaS Pricing — Agent adds our device cost(s) and Clover SaaS fees (if applicable).
+11. Add One-Time / Other Fees — Agent adds any application fee, deployment/shipping fee, optional insurance, etc. (if applicable).
+12. Calculate & Compare — System computes competitor total cost vs our proposed total cost.
+13. Display Savings (Timeframes) — System shows savings breakdown across timeframes (daily / weekly / monthly / quarterly / yearly).
+14. Visual Charts — System displays clear charts to support merchant conversation (savings visualization).
+15. Product Visuals — Devices/accessories show as small images/icons inside the app and comparison screens.
+16. Review Summary Screen — Agent reviews final summary before submission (merchant info, competitor, totals, savings, devices, SaaS).
+17. Submit Analysis — Agent submits the completed analysis (timestamp + audit log captured).
+18. Generate Client PDF — System generates branded PDF including: Blockpay logo + Clover logo, competitor name/logo, savings breakdown, proposal details, device + SaaS fees, and any applicable fees.
+19. Save / Sync — Analysis is saved locally (offline mode) and syncs securely when online (if iPad offline).
+20. Admin Visibility — Admin can view submissions, history, agent activity, and revoke access if needed.

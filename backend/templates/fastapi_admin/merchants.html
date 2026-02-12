@@ -1,0 +1,175 @@
+{% extends "fastapi_admin/base.html" %}
+{% set title = "Admin - Merchants" %}
+{% set active = "merchants" %}
+
+{% block content %}
+  {% if message %}
+    <div class="flash">✅ {{ message }}</div>
+  {% endif %}
+
+  <div class="split">
+    <div class="card">
+      <div style="font-weight:700; margin-bottom: 10px;">Create Merchant</div>
+      <form id="createForm">
+        <div style="margin-bottom: 10px;">
+          <label>User</label>
+          <select name="user_id" required>
+            {% for u in users %}
+              <option value="{{ u.id }}">{{ u.id }} — {{ u.username }}{% if u.email %} ({{ u.email }}){% endif %}</option>
+            {% endfor %}
+          </select>
+          <div class="hint" style="margin-top: 6px;">If the dropdown is empty, create a Django user first.</div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label>Business Name</label>
+          <input name="business_name" required placeholder="Acme Coffee" />
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label>Business Address</label>
+          <input name="business_address" placeholder="123 Main St, City" />
+        </div>
+
+        <div class="row" style="margin-bottom: 10px;">
+          <div>
+            <label>Contact Name</label>
+            <input name="contact_name" placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label>Contact Email</label>
+            <input name="contact_email" placeholder="jane@example.com" />
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label>Contact Phone</label>
+          <input name="contact_phone" placeholder="+1 555 123 4567" />
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label>Notes</label>
+          <textarea name="notes" placeholder="Anything useful for the client demo..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button class="primary" type="submit">Create</button>
+        </div>
+      </form>
+      <div id="createError" class="hint" style="margin-top: 10px; color: var(--danger); display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; gap: 10px; align-items:center; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:700;">Merchants</div>
+          <div class="muted">Showing latest {{ merchants | length }} records.</div>
+        </div>
+        <div class="hint">Tip: take a screenshot after Create / Edit / Delete.</div>
+      </div>
+
+      <div style="overflow:auto; margin-top: 10px;">
+        <table>
+          <thead>
+            <tr>
+              <th class="nowrap">ID</th>
+              <th class="nowrap">User</th>
+              <th>Business</th>
+              <th>Contact</th>
+              <th class="nowrap">Updated</th>
+              <th class="nowrap">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in merchants %}
+              <tr>
+                <td class="nowrap">{{ m.id }}</td>
+                <td class="nowrap">{{ m.user_id }}</td>
+                <td>
+                  <div style="font-weight: 600;">{{ m.business_name }}</div>
+                  <div class="muted">{{ m.business_address }}</div>
+                </td>
+                <td>
+                  <div>{{ m.contact_name }}</div>
+                  <div class="muted">{{ m.contact_email }}{% if m.contact_phone %} · {{ m.contact_phone }}{% endif %}</div>
+                </td>
+                <td class="nowrap">
+                  {% if m.updated_at %}{{ m.updated_at }}{% else %}<span class="muted">—</span>{% endif %}
+                </td>
+                <td class="nowrap">
+                  <a href="/admin/merchants/{{ m.id }}/edit">Edit</a>
+                  <span class="muted">·</span>
+                  <button type="button" class="danger" onclick="deleteMerchant({{ m.id }});">Delete</button>
+                </td>
+              </tr>
+            {% endfor %}
+            {% if merchants | length == 0 %}
+              <tr>
+                <td colspan="6" class="muted">No merchants yet. Create one on the left.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function qs(name) {
+      return document.querySelector(`[name="${name}"]`);
+    }
+
+    function showCreateError(text) {
+      const el = document.getElementById("createError");
+      el.textContent = text || "Unknown error";
+      el.style.display = "block";
+    }
+
+    function clearCreateError() {
+      const el = document.getElementById("createError");
+      el.textContent = "";
+      el.style.display = "none";
+    }
+
+    async function deleteMerchant(id) {
+      if (!confirm(`Delete merchant ${id}?`)) return;
+      const res = await fetch(`/merchants/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.href = "/admin/merchants?message=Deleted";
+        return;
+      }
+      const text = await res.text();
+      alert(`Delete failed: ${text}`);
+    }
+
+    document.getElementById("createForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearCreateError();
+
+      const payload = {
+        user_id: Number(qs("user_id").value),
+        business_name: qs("business_name").value,
+        business_address: qs("business_address").value || "",
+        contact_name: qs("contact_name").value || "",
+        contact_email: qs("contact_email").value || "",
+        contact_phone: qs("contact_phone").value || "",
+        notes: qs("notes").value || "",
+      };
+
+      const res = await fetch("/merchants/", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        showCreateError(text);
+        return;
+      }
+
+      const created = await res.json();
+      window.location.href = `/admin/merchants?message=Created%20%23${created.id}`;
+    });
+  </script>
+{% endblock %}

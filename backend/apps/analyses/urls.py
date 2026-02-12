@@ -25,6 +25,9 @@ from .views import (
     OneTimeFeeDetailView,
     AnalysisCalculateView,
     AnalysisImportFromStatementView,
+    AnalysisSummaryView,
+    CostBreakdownView,
+    ProposalPreviewView,
 )
 
 app_name = 'analyses'
@@ -44,6 +47,9 @@ urlpatterns = [
     path('<int:pk>/', AnalysisDetailView.as_view(), name='analysis_detail'),
     path('<int:pk>/calculate/', AnalysisCalculateView.as_view(), name='analysis_calculate'),
     path('<int:pk>/import-from-statement/', AnalysisImportFromStatementView.as_view(), name='analysis_import_from_statement'),
+    path('<int:pk>/summary/', AnalysisSummaryView.as_view(), name='analysis_summary'),
+    path('<int:pk>/cost-breakdown/', CostBreakdownView.as_view(), name='analysis_cost_breakdown'),
+    path('<int:pk>/proposal-preview/', ProposalPreviewView.as_view(), name='analysis_proposal_preview'),
 
     # Merchant Hardware endpoints
     path('hardware/', MerchantHardwareListCreateView.as_view(), name='hardware_list_create'),

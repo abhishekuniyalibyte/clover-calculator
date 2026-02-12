@@ -261,3 +261,71 @@ class CreateAgentView(generics.CreateAPIView):
             'user': user_serializer.data,
             'message': 'Agent user created successfully'
         }, status=status.HTTP_201_CREATED)
+
+
+class DashboardView(APIView):
+    """
+    Agent/Admin dashboard: summary stats + recent analyses + pending drafts.
+    Agents see only their own data; admins see all agents.
+    GET /api/v1/auth/dashboard/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.analyses.models import Analysis, Merchant
+
+        user = request.user
+        is_admin = user.is_superuser or user.role == 'ADMIN'
+
+        if is_admin:
+            analyses_qs = Analysis.objects.select_related('merchant', 'competitor', 'user')
+            merchants_qs = Merchant.objects.all()
+        else:
+            analyses_qs = Analysis.objects.filter(user=user).select_related('merchant', 'competitor')
+            merchants_qs = Merchant.objects.filter(user=user)
+
+        total_analyses = analyses_qs.count()
+        total_merchants = merchants_qs.count()
+        draft_count = analyses_qs.filter(status='DRAFT').count()
+        submitted_count = analyses_qs.filter(status='SUBMITTED').count()
+
+        recent = analyses_qs.order_by('-created_at')[:5]
+        recent_analyses = []
+        for a in recent:
+            entry = {
+                'id': a.id,
+                'merchant_name': a.merchant.business_name,
+                'competitor_name': a.competitor.name if a.competitor else None,
+                'status': a.status,
+                'created_at': a.created_at,
+            }
+            if is_admin:
+                entry['agent_name'] = a.user.get_full_name() or a.user.username
+            recent_analyses.append(entry)
+
+        pending_qs = analyses_qs.filter(status='DRAFT').order_by('-updated_at')[:5]
+        pending_tasks = [
+            {
+                'analysis_id': a.id,
+                'merchant_name': a.merchant.business_name,
+                'status': a.status,
+                'updated_at': a.updated_at,
+            }
+            for a in pending_qs
+        ]
+
+        return Response({
+            'user': {
+                'id': user.id,
+                'name': user.get_full_name() or user.username,
+                'role': user.role,
+            },
+            'stats': {
+                'total_merchants': total_merchants,
+                'total_analyses': total_analyses,
+                'drafts': draft_count,
+                'submitted': submitted_count,
+            },
+            'recent_analyses': recent_analyses,
+            'pending_tasks': pending_tasks,
+        })

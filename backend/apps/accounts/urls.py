@@ -11,6 +11,7 @@ from .views import (
     UserDetailView,
     CreateAdminView,
     CreateAgentView,
+    DashboardView,
 )
 
 app_name = 'accounts'
@@ -33,4 +34,7 @@ urlpatterns = [
     # User creation with hierarchy (Superuser/Admin only)
     path('admin/create-admin/', CreateAdminView.as_view(), name='create_admin'),
     path('admin/create-agent/', CreateAgentView.as_view(), name='create_agent'),
+
+    # Dashboard
+    path('dashboard/', DashboardView.as_view(), name='dashboard'),
 ]
