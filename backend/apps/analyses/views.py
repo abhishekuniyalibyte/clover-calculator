@@ -968,3 +968,64 @@ class AnalysisImportFromStatementView(APIView):
             'fields_imported': imported,
             'message': f'{len(imported)} field(s) imported from statement.',
         }, status=status.HTTP_200_OK)
+
+
+# ===== Phase 4: PDF Proposal Generation =====
+
+class GeneratePDFView(APIView):
+    """
+    Generate (or regenerate) a branded Blockpay proposal PDF for an analysis.
+    The PDF is saved to media/proposals/ and returned as a file download.
+    GET /api/v1/analyses/{id}/generate-pdf/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from django.http import FileResponse
+        from django.utils import timezone
+        from django.core.files.base import ContentFile
+        from .pdf_generator import ProposalPDFGenerator
+
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('merchant', 'competitor')
+            .prefetch_related(
+                'hardware_costs',
+                'pricing_models',
+                'proposed_devices__device',
+                'proposed_saas__saas_plan',
+                'onetime_fees',
+            ),
+            pk=pk
+        )
+
+        if not (request.user.is_superuser or request.user.role == 'ADMIN'):
+            if analysis.user != request.user:
+                raise PermissionDenied("You do not have permission to access this analysis.")
+
+        try:
+            generator = ProposalPDFGenerator(analysis, request)
+            pdf_buffer = generator.generate()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"PDF generation failed for analysis {pk}: {e}", exc_info=True)
+            return Response(
+                {'error': True, 'message': f'PDF generation failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Save PDF to Analysis record (overwrites any previous version)
+        safe_name = analysis.merchant.business_name.replace(' ', '_').replace('/', '-')
+        filename = f"blockpay_proposal_{safe_name}_{analysis.id}.pdf"
+        analysis.generated_pdf.save(filename, ContentFile(pdf_buffer.getvalue()), save=False)
+        analysis.generated_pdf_at = timezone.now()
+        analysis.save(update_fields=['generated_pdf', 'generated_pdf_at'])
+
+        # Stream the PDF back as a download
+        pdf_buffer.seek(0)
+        response = FileResponse(
+            pdf_buffer,
+            content_type='application/pdf',
+            as_attachment=True,
+            filename=filename,
+        )
+        return response

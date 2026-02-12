@@ -184,6 +184,54 @@ Built Phase 3 — Frontend-Ready APIs. Added 5 new endpoints to serve the Flutte
 
 ================================================================================
 
+## February 12, 2026 (continued)
+
+Built Phase 4 — PDF Proposal Generation. The system can now generate a branded, multi-section PDF proposal and return it as a file download, while also saving it linked to the Analysis record.
+
+**New Endpoint:**
+
+`GET /api/v1/analyses/{id}/generate-pdf/`
+- Generates a professional Blockpay proposal PDF on demand.
+- Returns the PDF as a direct file download (Content-Disposition: attachment).
+- Saves the generated PDF to `media/proposals/` and records the timestamp on the Analysis.
+- Calling it again regenerates and overwrites the previous PDF.
+
+**PDF Contents (2+ pages):**
+1. Navy blue header bar — Blockpay logo | "PROPOSAL" title | Clover logo (logos loaded from `media/brand/blockpay_logo.png` and `media/brand/clover_logo.png` if present; text fallback otherwise)
+2. Merchant + Competitor strip — business name, address, current processor name/logo, current monthly cost
+3. Savings Hero — three-column callout: Current monthly cost (red) | YOU SAVE / month (navy) | Blockpay monthly cost (green), plus annual savings + break-even line
+4. Current Processing Costs table — processing, per-transaction, monthly fees, hardware; red total row
+5. Proposed Blockpay Solution table — pricing model, device leases, SaaS plans; green total row
+6. One-Time Costs table — device purchases + one-time fees (only shown if one-time total > 0)
+7. Savings Timeline table — Daily / Weekly / Monthly / Quarterly / Yearly in navy/light-blue columns
+
+**Branding:**
+- Colors: Navy blue (#1B3A6B), white, black, light gray — matches client brand spec
+- Competitor logo rendered from database when available; falls back to competitor name text
+- Logo files for Blockpay and Clover can be placed at `media/brand/blockpay_logo.png` and `media/brand/clover_logo.png`
+
+**Model Changes:**
+- Added `generated_pdf` (FileField → media/proposals/) and `generated_pdf_at` (DateTimeField) to Analysis model
+- Migration 0004 applied — no data loss, both fields nullable
+
+**Library Added:**
+- reportlab==4.2.5 added to requirements/base.txt and installed
+
+**Files Created/Modified:**
+- backend/apps/analyses/pdf_generator.py — new ProposalPDFGenerator class (ReportLab)
+- backend/apps/analyses/views.py — added GeneratePDFView
+- backend/apps/analyses/urls.py — registered /api/v1/analyses/{id}/generate-pdf/
+- backend/apps/analyses/models.py — added generated_pdf + generated_pdf_at fields
+- backend/apps/analyses/migrations/0004_add_generated_pdf_to_analysis.py — migration
+
+**Test Result:**
+- GET /api/v1/analyses/1/generate-pdf/ → HTTP 200
+- Downloaded valid PDF document, version 1.4, 2 pages, 5067 bytes
+- File saved to media/proposals/blockpay_proposal_Pizza_Paradise_1.pdf
+- generated_pdf_at timestamp confirmed in database
+
+================================================================================
+
 ## Next Steps
 
 **Phase 1: Foundation ✓ COMPLETED**
@@ -218,18 +266,19 @@ Built Phase 3 — Frontend-Ready APIs. Added 5 new endpoints to serve the Flutte
 - ✓ Proposal Preview API: GET /api/v1/analyses/{id}/proposal-preview/
 - ✓ All APIs return Flutter-friendly nested format with proper field names
 
-**Phase 4: PDF Proposal Generation**
-- Design professional Blockpay proposal template
-- Install PDF generation library (ReportLab or WeasyPrint)
-- Build PDF generator that includes:
-  - Executive summary with savings highlight
-  - Current processing costs breakdown
-  - Proposed Blockpay solution details
-  - Device and SaaS recommendations
-  - Pricing model comparison table
-  - Total costs and savings summary
-- Create API endpoint to generate and download proposal PDF
-- Store generated PDFs linked to Analysis records
+**Phase 4: PDF Proposal Generation ✓ COMPLETED**
+- ✓ Designed professional Blockpay proposal template (navy/white/black branding)
+- ✓ Installed ReportLab 4.2.5 for PDF generation
+- ✓ Built PDF generator with:
+  - ✓ Header with Blockpay + Clover logos
+  - ✓ Merchant & competitor info with competitor logo
+  - ✓ Savings hero section (current vs proposed vs savings)
+  - ✓ Current processing costs breakdown table
+  - ✓ Proposed Blockpay solution table (pricing + devices + SaaS)
+  - ✓ One-time costs table (when applicable)
+  - ✓ Savings timeline (daily → yearly)
+- ✓ API endpoint: GET /api/v1/analyses/{id}/generate-pdf/
+- ✓ Generated PDFs saved to media/proposals/ linked to Analysis records
 
 **Phase 5: Polish & Production Prep**
 - Write comprehensive API documentation for Flutter developer

@@ -214,6 +214,19 @@ class Analysis(models.Model):
         help_text='Agent notes and observations'
     )
 
+    # Generated proposal PDF
+    generated_pdf = models.FileField(
+        upload_to='proposals/',
+        null=True,
+        blank=True,
+        help_text='Generated Blockpay proposal PDF'
+    )
+    generated_pdf_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the proposal PDF was last generated'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

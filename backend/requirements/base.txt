@@ -35,3 +35,6 @@ Pillow==10.2.0
 
 # LLM for data extraction
 groq==0.11.0
+
+# PDF Generation
+reportlab==4.2.5

@@ -28,6 +28,7 @@ from .views import (
     AnalysisSummaryView,
     CostBreakdownView,
     ProposalPreviewView,
+    GeneratePDFView,
 )
 
 app_name = 'analyses'
@@ -50,6 +51,7 @@ urlpatterns = [
     path('<int:pk>/summary/', AnalysisSummaryView.as_view(), name='analysis_summary'),
     path('<int:pk>/cost-breakdown/', CostBreakdownView.as_view(), name='analysis_cost_breakdown'),
     path('<int:pk>/proposal-preview/', ProposalPreviewView.as_view(), name='analysis_proposal_preview'),
+    path('<int:pk>/generate-pdf/', GeneratePDFView.as_view(), name='analysis_generate_pdf'),
 
     # Merchant Hardware endpoints
     path('hardware/', MerchantHardwareListCreateView.as_view(), name='hardware_list_create'),
